@@ -18,12 +18,24 @@ function saveConfig(cfg) {
 
 let mainWindow;
 let serverHandle;
+let serverStarting;
 
 async function startEmbeddedServer() {
+  if (serverHandle) return serverHandle;
+  if (serverStarting) return serverStarting;
   const { startServer } = require('../server/index');
   const dbPath = path.join(app.getPath('userData'), 'neuralab.db');
-  serverHandle = await startServer({ dbPath, port: 4317 });
-  return serverHandle;
+  serverStarting = startServer({ dbPath, port: 4317 })
+    .then((handle) => {
+      serverHandle = handle;
+      serverStarting = null;
+      return handle;
+    })
+    .catch((err) => {
+      serverStarting = null;
+      throw err;
+    });
+  return serverStarting;
 }
 
 function createWindow() {
@@ -78,21 +90,33 @@ ipcMain.handle('app:reset', () => {
   app.exit(0);
 });
 
-app.whenReady().then(async () => {
-  const cfg = loadConfig();
-  if (cfg && cfg.mode === 'host') {
-    try {
-      await startEmbeddedServer();
-    } catch (err) {
-      dialog.showErrorBox('Ошибка запуска сервера', String(err));
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
     }
-  }
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
+
+  app.whenReady().then(async () => {
+    const cfg = loadConfig();
+    if (cfg && cfg.mode === 'host') {
+      try {
+        await startEmbeddedServer();
+      } catch (err) {
+        dialog.showErrorBox('Ошибка запуска сервера', String(err));
+      }
+    }
+    createWindow();
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
