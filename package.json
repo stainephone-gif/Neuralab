@@ -11,10 +11,10 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^11.3.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "multer": "^1.4.5-lts.1"
+    "multer": "^1.4.5-lts.1",
+    "node-sqlite3-wasm": "^0.8.27"
   },
   "devDependencies": {
     "electron": "^33.0.0",
