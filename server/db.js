@@ -1,4 +1,4 @@
-const Database = require('better-sqlite3');
+const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
@@ -8,8 +8,7 @@ function initDb(dbPath) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  db.exec('PRAGMA foreign_keys = ON');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -56,17 +55,17 @@ function initDb(dbPath) {
   if (!adminExists) {
     const hash = bcrypt.hashSync('admin', 10);
     db.prepare("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)")
-      .run('admin', hash, 'Руководитель', 'admin');
+      .run(['admin', hash, 'Руководитель', 'admin']);
   }
 
   const boardExists = db.prepare("SELECT id FROM boards LIMIT 1").get();
   if (!boardExists) {
     const now = Date.now();
-    const result = db.prepare("INSERT INTO boards (name, created_at) VALUES (?, ?)").run('Задачи', now);
-    const boardId = result.lastInsertRowid;
+    const result = db.prepare("INSERT INTO boards (name, created_at) VALUES (?, ?)").run(['Задачи', now]);
+    const boardId = Number(result.lastInsertRowid);
     const cols = ['К выполнению', 'В работе', 'Готово'];
     const insertCol = db.prepare("INSERT INTO columns (board_id, name, position) VALUES (?, ?, ?)");
-    cols.forEach((name, idx) => insertCol.run(boardId, name, idx));
+    cols.forEach((name, idx) => insertCol.run([boardId, name, idx]));
   }
 
   return db;

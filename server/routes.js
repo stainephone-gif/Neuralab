@@ -32,7 +32,7 @@ function createRoutes(db) {
     }
     const token = crypto.randomBytes(32).toString('hex');
     db.prepare("INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)")
-      .run(token, user.id, Date.now());
+      .run([token, user.id, Date.now()]);
     res.json({
       token,
       user: { id: user.id, username: user.username, name: user.name, role: user.role }
@@ -62,8 +62,8 @@ function createRoutes(db) {
     const hash = bcrypt.hashSync(password, 10);
     const result = db.prepare(
       "INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)"
-    ).run(username, hash, name, role === 'admin' ? 'admin' : 'user');
-    res.json({ id: result.lastInsertRowid });
+    ).run([username, hash, name, role === 'admin' ? 'admin' : 'user']);
+    res.json({ id: Number(result.lastInsertRowid) });
   });
 
   router.delete('/users/:id', auth, adminOnly, (req, res) => {
@@ -78,14 +78,15 @@ function createRoutes(db) {
     if (!board) return res.status(404).json({ error: 'No board' });
     const columns = db.prepare(
       "SELECT * FROM columns WHERE board_id = ? ORDER BY position"
-    ).all(board.id);
-    const cards = db.prepare(`
+    ).all([board.id]);
+    const columnIds = columns.map(c => c.id);
+    const cards = columnIds.length === 0 ? [] : db.prepare(`
       SELECT c.*, u.name AS assignee_name
       FROM cards c
       LEFT JOIN users u ON u.id = c.assignee_id
-      WHERE c.column_id IN (${columns.map(() => '?').join(',') || 'NULL'})
+      WHERE c.column_id IN (${columnIds.map(() => '?').join(',')})
       ORDER BY c.position
-    `).all(...columns.map(c => c.id));
+    `).all(columnIds);
     res.json({ board, columns, cards });
   });
 
@@ -94,11 +95,11 @@ function createRoutes(db) {
     if (!column_id || !title) return res.status(400).json({ error: 'Missing fields' });
     const maxPos = db.prepare(
       "SELECT COALESCE(MAX(position), -1) AS p FROM cards WHERE column_id = ?"
-    ).get(column_id).p;
+    ).get([column_id]).p;
     const result = db.prepare(`
       INSERT INTO cards (column_id, title, description, assignee_id, deadline, position, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
+    `).run([
       column_id,
       title,
       description || '',
@@ -106,8 +107,8 @@ function createRoutes(db) {
       deadline || null,
       maxPos + 1,
       Date.now()
-    );
-    res.json({ id: result.lastInsertRowid });
+    ]);
+    res.json({ id: Number(result.lastInsertRowid) });
   });
 
   router.put('/cards/:id', auth, (req, res) => {
@@ -122,13 +123,13 @@ function createRoutes(db) {
         assignee_id = ?,
         deadline = ?
       WHERE id = ?
-    `).run(
+    `).run([
       title ?? null,
       description ?? null,
       assignee_id ?? null,
       deadline ?? null,
       id
-    );
+    ]);
     res.json({ ok: true });
   });
 
@@ -147,20 +148,21 @@ function createRoutes(db) {
     const destColumn = db.prepare("SELECT * FROM columns WHERE id = ?").get(column_id);
     if (!destColumn) return res.status(400).json({ error: 'Bad column' });
 
-    const tx = db.transaction(() => {
+    db.exec('BEGIN');
+    try {
       db.prepare(`
         UPDATE cards SET position = position - 1
         WHERE column_id = ? AND position > ?
-      `).run(card.column_id, card.position);
+      `).run([card.column_id, card.position]);
 
       db.prepare(`
         UPDATE cards SET position = position + 1
         WHERE column_id = ? AND position >= ?
-      `).run(column_id, position);
+      `).run([column_id, position]);
 
       const lastColumn = db.prepare(
         "SELECT id FROM columns WHERE board_id = ? ORDER BY position DESC LIMIT 1"
-      ).get(destColumn.board_id);
+      ).get([destColumn.board_id]);
 
       const completedAt = (lastColumn && lastColumn.id === column_id)
         ? (card.completed_at || Date.now())
@@ -169,9 +171,12 @@ function createRoutes(db) {
       db.prepare(`
         UPDATE cards SET column_id = ?, position = ?, completed_at = ?
         WHERE id = ?
-      `).run(column_id, position, completedAt, id);
-    });
-    tx();
+      `).run([column_id, position, completedAt, id]);
+      db.exec('COMMIT');
+    } catch (err) {
+      db.exec('ROLLBACK');
+      throw err;
+    }
     res.json({ ok: true });
   });
 
@@ -191,7 +196,7 @@ function createRoutes(db) {
       WHERE u.role = 'user'
       GROUP BY u.id
       ORDER BY u.name
-    `).all(Date.now(), from, to);
+    `).all([Date.now(), from, to]);
 
     const overdueCards = db.prepare(`
       SELECT c.*, u.name AS assignee_name
@@ -201,7 +206,7 @@ function createRoutes(db) {
         AND c.deadline IS NOT NULL
         AND c.deadline < ?
       ORDER BY c.deadline
-    `).all(Date.now());
+    `).all([Date.now()]);
 
     res.json({ byUser, overdueCards });
   });
