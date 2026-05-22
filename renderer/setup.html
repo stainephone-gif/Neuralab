@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Neuralab — настройка</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="setup-container">
+    <h1>Добро пожаловать в Neuralab</h1>
+    <p class="muted">Выберите, как запустить приложение на этом компьютере</p>
+
+    <div class="setup-cards">
+      <div class="setup-card">
+        <h2>Я — руководитель</h2>
+        <p>На этом компьютере будет работать сервер. Остальные сотрудники подключатся по локальной сети.</p>
+        <p class="hint">Выберите этот вариант на одном компьютере в офисе.</p>
+        <button id="host-btn">Запустить как сервер</button>
+      </div>
+
+      <div class="setup-card">
+        <h2>Я — сотрудник</h2>
+        <p>Подключиться к серверу, который уже работает на компьютере руководителя.</p>
+        <label>Адрес сервера:</label>
+        <input id="server-url" placeholder="http://192.168.1.10:4317">
+        <button id="client-btn">Подключиться</button>
+      </div>
+    </div>
+
+    <div id="status"></div>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const status = document.getElementById('status');
+    const result = document.getElementById('result');
+
+    document.getElementById('host-btn').addEventListener('click', async () => {
+      status.textContent = 'Запуск сервера...';
+      try {
+        const cfg = await window.neuralab.setupHost();
+        result.innerHTML = `
+          <div class="success">
+            <h3>Сервер запущен!</h3>
+            <p>Адрес для подчинённых: <code>${cfg.serverUrl}</code></p>
+            <p>Логин по умолчанию: <code>admin</code> / пароль: <code>admin</code></p>
+            <p class="warn">Обязательно смените пароль после входа.</p>
+            <button id="continue-btn">Открыть приложение</button>
+          </div>
+        `;
+        status.textContent = '';
+        document.getElementById('continue-btn').addEventListener('click', () => {
+          window.neuralab.reload();
+        });
+      } catch (err) {
+        status.innerHTML = `<div class="error">Ошибка: ${err.message || err}</div>`;
+      }
+    });
+
+    document.getElementById('client-btn').addEventListener('click', async () => {
+      let url = document.getElementById('server-url').value.trim();
+      if (!url) {
+        status.innerHTML = '<div class="error">Укажите адрес сервера</div>';
+        return;
+      }
+      if (!url.startsWith('http')) url = 'http://' + url;
+      status.textContent = 'Подключение...';
+      const res = await window.neuralab.setupClient(url);
+      if (res.ok) {
+        status.textContent = '';
+        window.neuralab.reload();
+      } else {
+        status.innerHTML = `<div class="error">Не удалось подключиться: ${res.error}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
