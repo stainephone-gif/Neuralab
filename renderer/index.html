@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Neuralab</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div id="login-view" class="hidden">
+      <div class="login-box">
+        <h1>Neuralab</h1>
+        <input id="login-username" placeholder="Логин" autocomplete="username">
+        <input id="login-password" type="password" placeholder="Пароль" autocomplete="current-password">
+        <button id="login-btn">Войти</button>
+        <div id="login-error" class="error"></div>
+        <div class="muted small">
+          <a href="#" id="reset-config">Изменить настройки подключения</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="main-view" class="hidden">
+      <header>
+        <div class="header-left">
+          <strong>Neuralab</strong>
+          <nav>
+            <a href="#" data-view="board" class="active">Доска</a>
+            <a href="#" data-view="reports">Отчёты</a>
+            <a href="#" data-view="users" id="users-link">Сотрудники</a>
+          </nav>
+        </div>
+        <div class="header-right">
+          <span id="current-user"></span>
+          <button id="logout-btn">Выйти</button>
+        </div>
+      </header>
+
+      <div id="board-view" class="view"></div>
+      <div id="reports-view" class="view hidden"></div>
+      <div id="users-view" class="view hidden"></div>
+    </div>
+  </div>
+
+  <div id="modal" class="modal hidden">
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
